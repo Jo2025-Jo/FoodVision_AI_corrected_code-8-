@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoodVision AI | Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dashboard-page">
+
+    <aside class="sidebar">
+        <a class="brand" href="{{ url_for('dashboard') }}">
+            <span class="brand-icon">✦</span> FoodVision AI
+        </a>
+
+        <div class="nav-label">WORKSPACE</div>
+        <a class="nav-link active" href="{{ url_for('dashboard') }}">
+            <span>▦</span> Dashboard
+        </a>
+        <a class="nav-link" href="#recognition">
+            <span>◉</span> Food Recognition
+        </a>
+        <a class="nav-link" href="#results">
+            <span>◈</span> Analysis Results
+        </a>
+
+        <div class="sidebar-bottom">
+            <div class="profile-avatar">{{ username[:1]|upper }}</div>
+            <div class="profile-details">
+                <strong>{{ username }}</strong>
+                <span>Project User</span>
+            </div>
+            <a class="logout-link" href="{{ url_for('logout') }}" title="Logout">↗</a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="topbar">
+            <div>
+                <div class="breadcrumb">Workspace / Dashboard</div>
+                <h1>Food Recognition Dashboard</h1>
+                <p class="muted">Upload, classify, and review your food images.</p>
+            </div>
+            <div class="status-pill">
+                <span class="status-dot"></span> Local AI workspace
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="alert {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        <section class="welcome-banner">
+            <div>
+                <span class="eyebrow">FOODVISION WORKSPACE</span>
+                <h2>Discover what's on your plate.</h2>
+                <p>Upload an image to run it through your configured recognition model.</p>
+            </div>
+            <div class="banner-art">🥑</div>
+        </section>
+
+        <section class="stats-grid">
+            <article class="stat-card">
+                <div class="stat-icon purple">◉</div>
+                <span>Recognition engine</span>
+                <strong>{{ "Ready" if model_ready else "Unavailable" }}</strong>
+                <small>{{ "Model loaded" if model_ready else "Model needs attention" }}</small>
+            </article>
+            <article class="stat-card">
+                <div class="stat-icon orange">✧</div>
+                <span>Latest prediction</span>
+                <strong>{{ result.label if result else "—" }}</strong>
+                <small>Current session</small>
+            </article>
+            <article class="stat-card">
+                <div class="stat-icon green">⌁</div>
+                <span>Top prediction score</span>
+                <strong>
+                    {% if result and result.confidence is not none %}
+                        {{ "%.2f"|format(result.confidence) }}%
+                    {% else %}
+                        —
+                    {% endif %}
+                </strong>
+                <small>Model output, not a guarantee</small>
+            </article>
+        </section>
+
+        {% if not model_ready %}
+            <div class="alert error">
+                <strong>Recognition model unavailable.</strong>
+                {{ model_error }}
+            </div>
+        {% endif %}
+
+        <section class="workspace-grid" id="recognition">
+            <article class="panel upload-panel">
+                <div class="panel-heading">
+                    <div>
+                        <span class="eyebrow">STEP 01</span>
+                        <h2>Upload food image</h2>
+                    </div>
+                    <span class="panel-number">01</span>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <label class="drop-zone" for="food_image">
+                        <div class="upload-symbol">↑</div>
+                        <h3>Choose an image to analyse</h3>
+                        <p>JPG, JPEG, PNG or WEBP · Max 10 MB</p>
+                        <span class="choose-button">Browse image</span>
+                        <input id="food_image" name="food_image" type="file"
+                               accept=".jpg,.jpeg,.png,.webp,image/*" required>
+                        <span id="fileName" class="file-name">No file selected</span>
+                    </label>
+                    <button class="primary-button" type="submit" {% if not model_ready %}disabled{% endif %}>
+                        Recognize Food <span>→</span>
+                    </button>
+                </form>
+            </article>
+
+            <article class="panel preview-panel">
+                <div class="panel-heading">
+                    <div>
+                        <span class="eyebrow">STEP 02</span>
+                        <h2>Image preview</h2>
+                    </div>
+                    <span class="panel-number">02</span>
+                </div>
+
+                {% if image_url %}
+                    <img class="preview-image" src="{{ image_url }}" alt="Uploaded food">
+                {% else %}
+                    <div class="preview-placeholder">
+                        <div class="preview-emoji">🍽️</div>
+                        <h3>Your image will appear here</h3>
+                        <p>Choose an image to start the analysis.</p>
+                    </div>
+                {% endif %}
+            </article>
+        </section>
+
+        <section class="panel results-panel" id="results">
+            <div class="panel-heading">
+                <div>
+                    <span class="eyebrow">STEP 03</span>
+                    <h2>Recognition results</h2>
+                </div>
+                <span class="result-badge">{{ "Analysis complete" if result else "Waiting for image" }}</span>
+            </div>
+
+            {% if result %}
+                <div class="result-summary">
+                    <div class="result-food-icon">🍴</div>
+                    <div class="result-main">
+                        <span class="muted">Predicted food class</span>
+                        <h3>{{ result.label }}</h3>
+                    </div>
+                    {% if result.confidence is not none %}
+                        <div class="confidence-box">
+                            <span>Model score</span>
+                            <strong>{{ "%.2f"|format(result.confidence) }}%</strong>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if result.top_predictions %}
+                    <h3 class="subheading">Top model predictions</h3>
+                    <div class="prediction-list">
+                        {% for item in result.top_predictions %}
+                            <div class="prediction-row">
+                                <span>{{ item.label }}</span>
+                                <div class="bar-track">
+                                    <div class="bar-fill" style="width: {{ item.confidence }}%"></div>
+                                </div>
+                                <strong>{{ "%.2f"|format(item.confidence) }}%</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="muted">This model does not provide probability scores.</p>
+                {% endif %}
+
+                <p class="disclaimer">
+                    Predictions depend on the model's training classes and performance.
+                    A displayed score is not a guarantee of correctness.
+                </p>
+            {% else %}
+                <div class="empty-results">
+                    <span>◈</span>
+                    <p>Your recognition results will appear here after image analysis.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <footer class="footer">
+            <span>FoodVision AI</span>
+            <span>Food image classification workspace</span>
+        </footer>
+    </main>
+
+    <script>
+        const imageInput = document.getElementById("food_image");
+        const fileName = document.getElementById("fileName");
+
+        imageInput.addEventListener("change", function () {
+            fileName.textContent = this.files.length
+                ? this.files[0].name
+                : "No file selected";
+        });
+    </script>
+</body>
+</html>
